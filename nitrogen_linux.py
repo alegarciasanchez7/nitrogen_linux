@@ -1,42 +1,7 @@
 import time
 from datetime import datetime
 from variables_type import NumericVariable, StringVariable, ListVariable, DateVariable
-
-# --- CLASE CONECTOR (Simulando Sección 3.3) ---
-
-class Connector:
-    """Representa un flujo de envío de datos [cite: 59]"""
-    def __init__(self, name, template, output_type="console"):
-        self.name = name
-        self.template = template  # El formato del texto a enviar 
-        self.output_type = output_type
-        self.variables = {} # Diccionario de variables locales
-
-    def add_variable(self, variable):
-        self.variables[variable.name] = variable
-
-    def _process_template(self):
-        """Sustituye las variables en el texto.
-        nITROGEN usa $#Rd.LO.Num#$, nosotros usaremos {NombreVariable} para simplificar.
-        """
-        output = self.template
-        for var_name, var_obj in self.variables.items():
-            # 1. Generar nuevo dato
-            var_obj.generate()
-            # 2. Sustituir en el texto
-            # Usamos un reemplazo simple de string para simular la construcción del mensaje
-            output = output.replace(f"{{{var_name}}}", str(var_obj.get_value()))
-        return output
-
-    def send(self):
-        message = self._process_template()
-        
-        # Aquí implementaremos MQTT, TCP, Fichero más adelante 
-        if self.output_type == "console":
-            print(f"[{self.name}] Enviando: {message}")
-        elif self.output_type == "file":
-            with open(f"{self.name}.txt", "a") as f:
-                f.write(message + "\n")
+from connectors import Connector, MqttConnector
 
 # --- CLASE GRUPO (Simulando Sección 3.1 - Panel Central) ---
 
@@ -78,59 +43,45 @@ class NitrogenEngine:
         except KeyboardInterrupt:
             print("\nDeteniendo simulación...")
 
-# --- EJEMPLO DE USO (Simulación de lo que harías en la GUI) ---
+# --- EJEMPLO DE USO CON MQTT ---
 
 if __name__ == "__main__":
-    # 1. Crear el motor
-    engine = NitrogenEngine(frequency_ms=2000) # 2 segundos por tick para leerlo bien
+    engine = NitrogenEngine(frequency_ms=2000) # 2 segundos por envío
 
-    # --- VARIABLES ---
+    # 1. Definir Variables
+    temp = NumericVariable("Temp", 20, 25, strategy="random")
+    humedad = NumericVariable("Humedad", 40, 60, strategy="random")
+    estado = ListVariable("Estado", ["ACTIVO", "ESPERA"], strategy="random")
     
-    # Numérica: Temperatura (20-30°C)
-    temp_var = NumericVariable("Temperatura", 20, 30, strategy="random")
+    # Variable de fecha para timestamp
+    reloj = DateVariable("Ts", strategy="now", date_format="%H:%M:%S")
+
+    # 2. Configurar Conector MQTT
+    # Usaremos el broker público de Eclipse para pruebas: test.mosquitto.org
+    # Topic: nitrogen/linux/prueba (Puedes cambiarlo para que sea único)
     
-    # String: Número de Serie del dispositivo (Longitud fija 10, Mayúsculas y Números)
-    # Mapeo manual: Fixed Size=10, UpperCase=Yes, Numbers=Yes, Lower=No, Sym=No
-    serial_var = StringVariable("SerialNum", min_len=10, max_len=10, 
-                                use_upper=True, use_lower=False, 
-                                use_nums=True, use_sym=False)
-
-    # String: Token de sesión (Longitud variable 15-20, Todo incluido)
-    token_var = StringVariable("SessionToken", min_len=15, max_len=20, 
-                               use_upper=True, use_lower=True, 
-                               use_nums=True, use_sym=True)
+    plantilla_json = '{"ts": "{Ts}", "sensor": "LinuxBox", "temp": {Temp}, "hum": {Humedad}, "st": "{Estado}"}'
     
-    # TIPO LISTA: Días de la semana secuenciales [cite: 407]
-    dias = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
-    dia_var = ListVariable("DiaSemana", dias, strategy="serial", step=1)
+    # Instanciamos el MqttConnector en lugar del Connector base
+    mqtt_conn = MqttConnector("Salida_Nube", plantilla_json, 
+                              host="test.mosquitto.org", 
+                              port=1883, 
+                              topic="nitrogen/linux/prueba")
 
-    # TIPO LISTA: Estado del sistema (Aleatorio con pesos simulados por repetición)
-    estados = ["OK", "OK", "OK", "WARNING", "ERROR"] 
-    estado_var = ListVariable("Status", estados, strategy="random")
+    # Añadimos variables al conector
+    mqtt_conn.add_variable(temp)
+    mqtt_conn.add_variable(humedad)
+    mqtt_conn.add_variable(estado)
+    mqtt_conn.add_variable(reloj)
 
-    # TIPO FECHA: Timestamp incremental (simulando datos históricos)
-    # Empieza el 1 de Enero de 2024 y avanza 1 hora por cada tick
-    inicio = datetime(2024, 1, 1, 8, 0, 0)
-    fecha_var = DateVariable("Timestamp", strategy="increment", 
-                             base_date=inicio, increment_seconds=3600)
+    # 3. Crear Grupo y Arrancar
+    grupo = Group("Planta_IoT")
+    grupo.add_connector(mqtt_conn)
 
-    # --- CONECTOR ---
-
-    plantilla = (
-        'DATA | {Timestamp} | Dia: {DiaSemana} | Temp: {Temperatura} C | Estado: {Status}'
-    )
+    engine.add_group(grupo)
     
-    connector_log = Connector("Log_Diario", plantilla)
+    print("Consejo: Para ver los mensajes, puedes usar un cliente web MQTT")
+    print("o instalar 'mosquitto-clients' y ejecutar: mosquitto_sub -h test.mosquitto.org -t nitrogen/linux/prueba")
+    print("-" * 60)
     
-    # Registramos las variables en el conector
-    connector_log.add_variable(temp_var)
-    connector_log.add_variable(dia_var)
-    connector_log.add_variable(estado_var)
-    connector_log.add_variable(fecha_var)
-
-    # --- GRUPO Y ARRANQUE ---
-    grupo_sensores = Group("Sensores_Planta_1")
-    grupo_sensores.add_connector(connector_log)
-
-    engine.add_group(grupo_sensores)
     engine.start()
