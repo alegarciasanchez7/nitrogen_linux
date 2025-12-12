@@ -41,7 +41,7 @@ class NitrogenGUI:
         self.conn_options_frame.grid(row=0, column=2, columnspan=4, sticky="w")
         
         self.widgets_conn = {} # Para guardar referencias a inputs de conexión
-        self._show_mqtt_options() # Iniciar con opciones MQTT
+        self._toggle_conn_options() # Iniciar con opciones que aparecen en el selector
 
         # Frecuencia (Común a todos)
         ttk.Label(config_frame, text="Freq (ms):").grid(row=0, column=6, padx=5)
@@ -198,10 +198,57 @@ class NitrogenGUI:
         self.dynamic_widgets["step"]=e_s
 
     def _show_string_options(self):
-        # (Código simplificado de String, usa tu versión completa aquí si quieres)
-        ttk.Label(self.options_frame, text="Longitud:").pack()
-        e=ttk.Entry(self.options_frame); e.insert(0,"10"); e.pack(); self.dynamic_widgets["len"]=e
+        # Selector de Modo
+        ttk.Label(self.options_frame, text="Modo:").pack(anchor="w")
+        mode_combo = ttk.Combobox(self.options_frame, values=["Aleatorio", "Regex (Patrón)"], state="readonly")
+        mode_combo.current(0)
+        mode_combo.pack(fill="x", pady=2)
+        self.dynamic_widgets["str_mode"] = mode_combo
 
+        # Frame contenedor para los parámetros cambiantes
+        param_container = ttk.Frame(self.options_frame)
+        param_container.pack(fill="both", expand=True, pady=5)
+        
+        def toggle_params(event=None):
+            # Limpiar opciones anteriores
+            for widget in param_container.winfo_children():
+                widget.destroy()
+            
+            mode = mode_combo.get()
+            
+            if mode == "Regex (Patrón)":
+                ttk.Label(param_container, text="Expresión Regular:").pack(anchor="w")
+                entry_regex = ttk.Entry(param_container)
+                entry_regex.insert(0, r"[A-Z]{3}-\d{3}") 
+                entry_regex.pack(fill="x")
+                self.dynamic_widgets["regex_pattern"] = entry_regex
+                
+                # Ayuda visual
+                ttk.Label(param_container, text=r"Ej: \d{4}[A-Z] (Matrícula)", font=("Arial", 8)).pack(anchor="w")
+                
+            else: # Modo Aleatorio
+                f = ttk.Frame(param_container)
+                f.pack(fill="x")
+                ttk.Label(f, text="Min Len:").pack(side="left")
+                min_l = ttk.Entry(f, width=5); min_l.insert(0, "5"); min_l.pack(side="left", padx=2)
+                self.dynamic_widgets["min_len"] = min_l
+
+                ttk.Label(f, text="Max Len:").pack(side="left")
+                max_l = ttk.Entry(f, width=5); max_l.insert(0, "10"); max_l.pack(side="left", padx=2)
+                self.dynamic_widgets["max_len"] = max_l
+
+                # Checkboxes
+                self.dynamic_widgets["upper"] = tk.BooleanVar(value=True)
+                ttk.Checkbutton(param_container, text="A-Z", variable=self.dynamic_widgets["upper"]).pack(anchor="w")
+                self.dynamic_widgets["nums"] = tk.BooleanVar(value=True)
+                ttk.Checkbutton(param_container, text="0-9", variable=self.dynamic_widgets["nums"]).pack(anchor="w")
+                self.dynamic_widgets["syms"] = tk.BooleanVar(value=False)
+                ttk.Checkbutton(param_container, text="Simbolos", variable=self.dynamic_widgets["syms"]).pack(anchor="w")
+
+        # Vincular el evento y ejecutarlo una vez al inicio
+        mode_combo.bind("<<ComboboxSelected>>", toggle_params)
+        toggle_params()
+    
     def _show_list_options(self):
         ttk.Label(self.options_frame, text="Valores (CSV):").pack()
         t=tk.Text(self.options_frame, height=3, width=25); t.insert("1.0","ON,OFF"); t.pack(); self.dynamic_widgets["vals"]=t
@@ -238,10 +285,34 @@ class NitrogenGUI:
                                       anomaly_prob=a_prob, anomaly_value=val_anom)
                 desc = f"{name} [Num: {strat} | Step {step}]"
 
-            elif v_type == "Texto": # Simplificado
-                l = int(self.dynamic_widgets["len"].get())
-                var = StringVariable(name, min_len=l, max_len=l, anomaly_prob=a_prob, anomaly_value=a_val)
-                desc = f"{name} [Txt]"
+            elif v_type == "Texto":
+                mode = self.dynamic_widgets["str_mode"].get()
+                
+                # Intentar leer anomalía (si no es numérico, el valor anómalo se queda como texto)
+                try: a_prob = float(self.entry_anomaly_prob.get())
+                except: a_prob = 0.0
+                a_val = self.entry_anomaly_val.get()
+
+                if mode == "Regex (Patrón)":
+                    pat = self.dynamic_widgets["regex_pattern"].get()
+                    var = StringVariable(name, strategy="regex", pattern=pat, 
+                                           anomaly_prob=a_prob, anomaly_value=a_val)
+                    desc = f"{name} [Regex: {pat}]"
+                else:
+                    # Modo Aleatorio
+                    mn = int(self.dynamic_widgets["min_len"].get())
+                    mx = int(self.dynamic_widgets["max_len"].get())
+                    up = self.dynamic_widgets["upper"].get()
+                    nu = self.dynamic_widgets["nums"].get()
+                    sy = self.dynamic_widgets["syms"].get()
+                    
+                    var = StringVariable(name, strategy="random", min_len=mn, max_len=mx, 
+                                           use_upper=up, use_nums=nu, use_sym=sy,
+                                           anomaly_prob=a_prob, anomaly_value=a_val)
+                    desc = f"{name} [Txt: {mn}-{mx}]"
+                
+                # Añadir info de anomalía a la descripción si existe
+                if a_prob > 0: desc += f" | ⚠ {a_prob}%"
                 
             elif v_type == "Lista":
                 vals = self.dynamic_widgets["vals"].get("1.0", tk.END).replace("\n","").split(",")
@@ -272,11 +343,80 @@ class NitrogenGUI:
     def edit_selected_variable(self):
         sel = self.vars_listbox.curselection()
         if not sel: return
-        self.editing_index = sel[0]
-        var = self.added_variables[self.editing_index]
-        self.entry_var_name.delete(0, tk.END); self.entry_var_name.insert(0, var.name)
+        
+        index = sel[0]
+        var = self.added_variables[index]
+        self.editing_index = index 
+        
+        # 1. Ajustar UI al modo edición
+        self.btn_add_update.config(text="💾 Guardar Cambios")
         self.btn_cancel.config(state="normal")
-        # (Aquí deberías implementar la carga completa de valores al form, simplificado por espacio)
+        self.vars_listbox.config(state="disabled")
+
+        # 2. Rellenar Datos Comunes (Nombre y Anomalías)
+        self.entry_var_name.delete(0, tk.END)
+        self.entry_var_name.insert(0, var.name)
+        
+        # Cargar datos de Anomalía (Importante: Manejar si es None)
+        self.entry_anomaly_prob.delete(0, tk.END)
+        self.entry_anomaly_prob.insert(0, str(var.anomaly_prob))
+        
+        self.entry_anomaly_val.delete(0, tk.END)
+        self.entry_anomaly_val.insert(0, str(var.anomaly_value))
+        
+        # 3. Detectar Tipo y Rellenar campos específicos
+        if isinstance(var, NumericVariable):
+            self.combo_type.set("Numérico")
+            self._update_dynamic_options() # Recarga el panel vacío
+            
+            # Rellenar campos numéricos
+            self.dynamic_widgets["min"].delete(0, tk.END); self.dynamic_widgets["min"].insert(0, str(var.min_val))
+            self.dynamic_widgets["max"].delete(0, tk.END); self.dynamic_widgets["max"].insert(0, str(var.max_val))
+            self.dynamic_widgets["step"].delete(0, tk.END); self.dynamic_widgets["step"].insert(0, str(var.step))
+            self.dynamic_widgets["strategy"].set(var.strategy)
+            
+        elif isinstance(var, StringVariable):
+            self.combo_type.set("Texto")
+            self._update_dynamic_options() # Carga el panel inicial de texto
+            
+            if var.strategy == "regex":
+                # Si era Regex, cambiamos el combo y forzamos la actualización visual
+                self.dynamic_widgets["str_mode"].set("Regex (Patrón)")
+                self.dynamic_widgets["str_mode"].event_generate("<<ComboboxSelected>>")
+                self.root.update_idletasks() # Truco para asegurar que los widgets existen antes de escribir
+                
+                self.dynamic_widgets["regex_pattern"].delete(0, tk.END)
+                self.dynamic_widgets["regex_pattern"].insert(0, var.pattern)
+            else:
+                # Si era Aleatorio
+                self.dynamic_widgets["str_mode"].set("Aleatorio")
+                self.dynamic_widgets["str_mode"].event_generate("<<ComboboxSelected>>")
+                self.root.update_idletasks()
+                
+                self.dynamic_widgets["min_len"].delete(0, tk.END); self.dynamic_widgets["min_len"].insert(0, str(var.min_len))
+                self.dynamic_widgets["max_len"].delete(0, tk.END); self.dynamic_widgets["max_len"].insert(0, str(var.max_len))
+                self.dynamic_widgets["upper"].set(var.use_upper)
+                self.dynamic_widgets["nums"].set(var.use_nums)
+                self.dynamic_widgets["syms"].set(var.use_sym)
+
+        elif isinstance(var, ListVariable):
+            self.combo_type.set("Lista")
+            self._update_dynamic_options()
+            
+            # Convertir la lista de vuelta a texto CSV
+            text_val = ", ".join(var.values)
+            self.dynamic_widgets["vals"].delete("1.0", tk.END)
+            self.dynamic_widgets["vals"].insert("1.0", text_val)
+            self.dynamic_widgets["strat"].set(var.strategy)
+
+        elif isinstance(var, DateVariable):
+            self.combo_type.set("Fecha")
+            self._update_dynamic_options()
+            
+            self.dynamic_widgets["fmt"].delete(0, tk.END)
+            self.dynamic_widgets["fmt"].insert(0, var.date_format)
+            self.dynamic_widgets["strat"].set(var.strategy)
+
 
     def cancel_edit(self):
         self.editing_index = None
@@ -297,7 +437,7 @@ class NitrogenGUI:
         self.engine = NitrogenEngine(frequency_ms=int(self.entry_freq.get()))
         
         # Crear Plantilla JSON
-        json_parts = [f'"{v.name}": "{{{v.name}}}"' for v in self.added_variables]
+        json_parts = [f'"{v.name}": "{{{v.name}}}"' for v in self.added_variables if v is not None]
         template = "{" + ", ".join(json_parts) + "}"
         
         # SELECCIÓN DE CONECTOR

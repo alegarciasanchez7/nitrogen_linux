@@ -1,12 +1,12 @@
 """
-Implementación de 3.4.4 Tipo Fecha (Con Anomalías)
+Implementación de 3.4.4 Tipo Fecha (Con soporte para Anomalías)
 """
 import random
 from datetime import datetime, timedelta
 from .variable import Variable
 
 class DateVariable(Variable):
-    # AÑADIMOS anomaly_prob y anomaly_value al __init__
+    # AHORA ACEPTAMOS anomaly_prob y anomaly_value
     def __init__(self, name, strategy="now", base_date=None, end_date=None, 
                  increment_seconds=1, date_format="%Y-%m-%d %H:%M:%S",
                  anomaly_prob=0.0, anomaly_value="1970-01-01"):

@@ -1,15 +1,15 @@
 """
-Implementación de 3.4.3 Tipo Lista (Con Anomalías)
+Implementación de 3.4.3 Tipo Lista (Con soporte para Anomalías)
 """
 import random
 from .variable import Variable
 
 class ListVariable(Variable):
-    # AÑADIMOS anomaly_prob y anomaly_value al __init__
+    # AHORA ACEPTAMOS anomaly_prob y anomaly_value
     def __init__(self, name, values, strategy="random", step=1, 
                  anomaly_prob=0.0, anomaly_value="ERROR"):
         
-        # Pasamos los datos de anomalía a la clase padre (Variable)
+        # Pasamos los datos de anomalía al padre
         super().__init__(name, anomaly_prob, anomaly_value)
         
         self.values = values 
