@@ -4,7 +4,7 @@ import threading
 
 # Importamos tu lógica
 from nitrogen_linux import NitrogenEngine, Group
-from connectors import MqttConnector, FileConnector
+from connectors import MqttConnector, FileConnector, AmqpConnector
 from variables_type import NumericVariable, StringVariable, ListVariable, DateVariable
 
 class NitrogenGUI:
@@ -31,8 +31,8 @@ class NitrogenGUI:
 
         # Selector de Tipo de Conector
         ttk.Label(config_frame, text="Tipo Conector:").grid(row=0, column=0, padx=5)
-        self.combo_conn_type = ttk.Combobox(config_frame, values=["MQTT", "Fichero"], state="readonly", width=10)
-        self.combo_conn_type.current(0) # MQTT por defecto
+        self.combo_conn_type = ttk.Combobox(config_frame, values=["RabbitMQ", "MQTT", "Fichero"], state="readonly", width=10)
+        self.combo_conn_type.current(0) # RabbitMQ  por defecto
         self.combo_conn_type.grid(row=0, column=1, padx=5)
         self.combo_conn_type.bind("<<ComboboxSelected>>", self._toggle_conn_options)
 
@@ -107,10 +107,27 @@ class NitrogenGUI:
         for w in self.conn_options_frame.winfo_children(): w.destroy()
         self.widgets_conn = {}
         
-        if self.combo_conn_type.get() == "MQTT":
+        selection = self.combo_conn_type.get()
+        if selection == "MQTT":
             self._show_mqtt_options()
+        elif selection == "RabbitMQ":
+            self._show_amqp_options() # <--- NUEVA LLAMADA
         else:
             self._show_file_options()
+
+    # --- NUEVO MÉTODO PARA MOSTRAR CAMPOS DE RABBITMQ ---
+    def _show_amqp_options(self):
+        ttk.Label(self.conn_options_frame, text="Host:").pack(side="left")
+        e_h = ttk.Entry(self.conn_options_frame, width=15)
+        e_h.insert(0, "localhost")
+        e_h.pack(side="left", padx=2)
+        self.widgets_conn["host"] = e_h
+        
+        ttk.Label(self.conn_options_frame, text="Cola (Queue):").pack(side="left")
+        e_q = ttk.Entry(self.conn_options_frame, width=15)
+        e_q.insert(0, "sensores_iot")
+        e_q.pack(side="left", padx=2)
+        self.widgets_conn["queue"] = e_q
 
     def _show_mqtt_options(self):
         ttk.Label(self.conn_options_frame, text="Broker:").pack(side="left")
@@ -291,6 +308,12 @@ class NitrogenGUI:
             host = self.widgets_conn["host"].get()
             topic = self.widgets_conn["topic"].get()
             connector = MqttConnector("MQTT_Client", template, host=host, topic=topic, on_message_callback=self.log)
+        
+        elif conn_type == "RabbitMQ":  # <--- NUEVO BLOQUE
+            host = self.widgets_conn["host"].get()
+            queue = self.widgets_conn["queue"].get()
+            connector = AmqpConnector("RabbitMQ", template, host=host, queue=queue, on_message_callback=self.log)
+
         else:
             path = self.widgets_conn["filepath"].get()
             connector = FileConnector("File_Logger", template, filepath=path, on_message_callback=self.log)
