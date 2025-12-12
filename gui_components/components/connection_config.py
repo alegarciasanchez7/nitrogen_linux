@@ -1,0 +1,113 @@
+"""
+Panel de configuración de conexión (MQTT, RabbitMQ, Fichero)
+"""
+import tkinter as tk
+from tkinter import ttk, filedialog
+
+
+class ConnectionConfigPanel:
+    def __init__(self, parent):
+        self.parent = parent
+        self.widgets_conn = {}
+        
+        # Frame principal
+        self.frame = ttk.LabelFrame(parent, text="1. Configuración de Salida", padding=10)
+        
+        # Selector de Tipo de Conector
+        ttk.Label(self.frame, text="Tipo Conector:").grid(row=0, column=0, padx=5)
+        self.combo_conn_type = ttk.Combobox(
+            self.frame, 
+            values=["RabbitMQ", "MQTT", "Fichero"], 
+            state="readonly", 
+            width=10
+        )
+        self.combo_conn_type.current(0)
+        self.combo_conn_type.grid(row=0, column=1, padx=5)
+        self.combo_conn_type.bind("<<ComboboxSelected>>", self._toggle_conn_options)
+        
+        # Frame dinámico para opciones de conexión
+        self.conn_options_frame = ttk.Frame(self.frame)
+        self.conn_options_frame.grid(row=0, column=2, columnspan=4, sticky="w")
+        
+        # Frecuencia
+        ttk.Label(self.frame, text="Freq (ms):").grid(row=0, column=6, padx=5)
+        self.entry_freq = ttk.Entry(self.frame, width=8)
+        self.entry_freq.insert(0, "1000")
+        self.entry_freq.grid(row=0, column=7, padx=5)
+        
+        self._toggle_conn_options()
+    
+    def pack(self, **kwargs):
+        self.frame.pack(**kwargs)
+    
+    def _toggle_conn_options(self, event=None):
+        for w in self.conn_options_frame.winfo_children():
+            w.destroy()
+        self.widgets_conn = {}
+        
+        selection = self.combo_conn_type.get()
+        if selection == "MQTT":
+            self._show_mqtt_options()
+        elif selection == "RabbitMQ":
+            self._show_amqp_options()
+        else:
+            self._show_file_options()
+    
+    def _show_amqp_options(self):
+        ttk.Label(self.conn_options_frame, text="Host:").pack(side="left")
+        e_h = ttk.Entry(self.conn_options_frame, width=15)
+        e_h.insert(0, "localhost")
+        e_h.pack(side="left", padx=2)
+        self.widgets_conn["host"] = e_h
+        
+        ttk.Label(self.conn_options_frame, text="Cola (Queue):").pack(side="left")
+        e_q = ttk.Entry(self.conn_options_frame, width=15)
+        e_q.insert(0, "sensores_iot")
+        e_q.pack(side="left", padx=2)
+        self.widgets_conn["queue"] = e_q
+    
+    def _show_mqtt_options(self):
+        ttk.Label(self.conn_options_frame, text="Broker:").pack(side="left")
+        e_h = ttk.Entry(self.conn_options_frame)
+        e_h.insert(0, "test.mosquitto.org")
+        e_h.pack(side="left", padx=2)
+        self.widgets_conn["host"] = e_h
+        
+        ttk.Label(self.conn_options_frame, text="Topic:").pack(side="left")
+        e_t = ttk.Entry(self.conn_options_frame)
+        e_t.insert(0, "nitrogen/linux")
+        e_t.pack(side="left", padx=2)
+        self.widgets_conn["topic"] = e_t
+    
+    def _show_file_options(self):
+        f_container = ttk.Frame(self.conn_options_frame)
+        f_container.pack(side="left", fill="x", expand=True)
+        
+        ttk.Label(f_container, text="Ruta Archivo:").pack(side="left")
+        
+        e_f = ttk.Entry(f_container, width=30)
+        e_f.insert(0, "log_datos.txt")
+        e_f.pack(side="left", padx=5)
+        self.widgets_conn["filepath"] = e_f
+        
+        btn_browse = ttk.Button(f_container, text="📂 Examinar", command=self._open_file_dialog)
+        btn_browse.pack(side="left")
+    
+    def _open_file_dialog(self):
+        filepath = filedialog.asksaveasfilename(
+            defaultextension=".txt",
+            filetypes=[("Archivos de Texto", "*.txt"), ("CSV", "*.csv"), ("Todos", "*.*")],
+            title="Guardar Log de Simulación"
+        )
+        
+        if filepath:
+            self.widgets_conn["filepath"].delete(0, tk.END)
+            self.widgets_conn["filepath"].insert(0, filepath)
+    
+    def get_config(self):
+        """Retorna la configuración actual"""
+        return {
+            "type": self.combo_conn_type.get(),
+            "frequency": int(self.entry_freq.get()),
+            "options": self.widgets_conn
+        }
