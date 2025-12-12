@@ -5,7 +5,7 @@ import threading
 # Importamos tu lógica
 from nitrogen_linux import NitrogenEngine, Group
 from connectors import MqttConnector, FileConnector, AmqpConnector
-from variables_type import NumericVariable, StringVariable, ListVariable, DateVariable
+from variables_type import NumericVariable, StringVariable, ListVariable, DateVariable, PointVariable, BooleanVariable
 
 class NitrogenGUI:
     def __init__(self, root):
@@ -40,10 +40,10 @@ class NitrogenGUI:
         self.conn_options_frame = ttk.Frame(config_frame)
         self.conn_options_frame.grid(row=0, column=2, columnspan=4, sticky="w")
         
-        self.widgets_conn = {} # Para guardar referencias a inputs de conexión
-        self._toggle_conn_options() # Iniciar con opciones que aparecen en el selector
+        self.widgets_conn = {} 
+        self._toggle_conn_options() 
 
-        # Frecuencia (Común a todos)
+        # Frecuencia
         ttk.Label(config_frame, text="Freq (ms):").grid(row=0, column=6, padx=5)
         self.entry_freq = ttk.Entry(config_frame, width=8)
         self.entry_freq.insert(0, "1000")
@@ -53,41 +53,88 @@ class NitrogenGUI:
         vars_frame = ttk.LabelFrame(self.root, text="2. Diseñador de Variables", padding=10)
         vars_frame.pack(fill="both", expand=True, padx=10, pady=5)
 
-        # Panel Izquierdo (Formulario)
-        form_frame = ttk.Frame(vars_frame, width=400); form_frame.pack(side="left", fill="y", padx=5); form_frame.pack_propagate(False)
+        # ===================================================================
+        # ### INICIO CAMBIO SCROLL: Panel Izquierdo con Barra de Desplazamiento ###
+        # ===================================================================
+        
+        # 1. Contenedor principal del panel izquierdo
+        left_container = ttk.Frame(vars_frame, width=400)
+        left_container.pack(side="left", fill="y", padx=5)
+        
+        # 2. Crear Canvas (zona dibujable) y Scrollbar
+        canvas = tk.Canvas(left_container, width=370) # Un poco menos de 400 para dejar sitio al scroll
+        scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        
+        # 3. Frame interno que se moverá (aquí irán tus widgets)
+        self.scrollable_frame = ttk.Frame(canvas)
+        
+        # Truco: Actualizar la región de scroll cuando el frame interno cambie de tamaño
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+
+        # 4. Meter el frame dentro del canvas
+        canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+
+        # 5. Empaquetar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+
+        # IMPORTANTE: Asignamos 'form_frame' a nuestro nuevo frame desplazable
+        # Así el resto de tu código (abajo) añade los botones en el sitio correcto sin cambios
+        form_frame = self.scrollable_frame 
+        
+        # ===================================================================
+        # ### FIN CAMBIO SCROLL ###
+        # ===================================================================
 
         ttk.Label(form_frame, text="Nombre Variable:").pack(anchor="w")
-        self.entry_var_name = ttk.Entry(form_frame); self.entry_var_name.pack(fill="x", pady=2)
+        self.entry_var_name = ttk.Entry(form_frame)
+        self.entry_var_name.pack(fill="x", pady=2)
 
         ttk.Label(form_frame, text="Tipo:").pack(anchor="w", pady=(5, 0))
-        self.combo_type = ttk.Combobox(form_frame, state="readonly", values=["Numérico", "Texto", "Lista", "Fecha"])
+        # Asegúrate de tener todos los tipos aquí, incluido Punto y Booleano
+        self.combo_type = ttk.Combobox(form_frame, state="readonly", values=["Numérico", "Texto", "Lista", "Fecha", "Punto", "Booleano"])
         self.combo_type.current(0)
         self.combo_type.pack(fill="x", pady=2)
         self.combo_type.bind("<<ComboboxSelected>>", self._update_dynamic_options)
 
         self.options_frame = ttk.LabelFrame(form_frame, text="Parámetros", padding=5)
         self.options_frame.pack(fill="x", pady=5)
-        self._show_numeric_options() # Default
+        self._show_numeric_options() 
 
         # Panel Anomalía
         anomaly_frame = ttk.LabelFrame(form_frame, text="Anomalías (Fallos)", padding=5)
         anomaly_frame.pack(fill="x", pady=5)
-        ttk.Label(anomaly_frame, text="Probabilidad (%):").grid(row=0,column=0); e=ttk.Entry(anomaly_frame, width=8); e.insert(0,"0"); e.grid(row=0,column=1)
-        self.entry_anomaly_prob = e
-        ttk.Label(anomaly_frame, text="Valor:").grid(row=0,column=2); e=ttk.Entry(anomaly_frame, width=10); e.insert(0,"ERR"); e.grid(row=0,column=3)
-        self.entry_anomaly_val = e
+        ttk.Label(anomaly_frame, text="Probabilidad (%):").grid(row=0,column=0)
+        self.entry_anomaly_prob = ttk.Entry(anomaly_frame, width=8)
+        self.entry_anomaly_prob.insert(0,"0")
+        self.entry_anomaly_prob.grid(row=0,column=1)
+        
+        ttk.Label(anomaly_frame, text="Valor:").grid(row=0,column=2)
+        self.entry_anomaly_val = ttk.Entry(anomaly_frame, width=10)
+        self.entry_anomaly_val.insert(0,"ERR")
+        self.entry_anomaly_val.grid(row=0,column=3)
 
         # Botones
-        btn_box = ttk.Frame(form_frame); btn_box.pack(fill="x", pady=10)
-        self.btn_add_update = ttk.Button(btn_box, text="⬇ Añadir Variable", command=self.add_or_update_variable); self.btn_add_update.pack(side="left", fill="x", expand=True)
-        self.btn_cancel = ttk.Button(btn_box, text="Cancelar", command=self.cancel_edit, state="disabled"); self.btn_cancel.pack(side="right")
+        btn_box = ttk.Frame(form_frame)
+        btn_box.pack(fill="x", pady=10)
+        self.btn_add_update = ttk.Button(btn_box, text="⬇ Añadir Variable", command=self.add_or_update_variable)
+        self.btn_add_update.pack(side="left", fill="x", expand=True)
+        self.btn_cancel = ttk.Button(btn_box, text="Cancelar", command=self.cancel_edit, state="disabled")
+        self.btn_cancel.pack(side="right")
 
         # Panel Derecho (Lista)
-        list_frame = ttk.Frame(vars_frame); list_frame.pack(side="right", fill="both", expand=True, padx=5)
-        self.vars_listbox = tk.Listbox(list_frame, bg="#f0f0f0"); self.vars_listbox.pack(fill="both", expand=True)
+        list_frame = ttk.Frame(vars_frame)
+        list_frame.pack(side="right", fill="both", expand=True, padx=5)
+        self.vars_listbox = tk.Listbox(list_frame, bg="#f0f0f0")
+        self.vars_listbox.pack(fill="both", expand=True)
         self.vars_listbox.bind('<Double-Button-1>', lambda e: self.edit_selected_variable())
         
-        l_btns = ttk.Frame(list_frame); l_btns.pack(fill="x", pady=5)
+        l_btns = ttk.Frame(list_frame)
+        l_btns.pack(fill="x", pady=5)
         ttk.Button(l_btns, text="Editar", command=self.edit_selected_variable).pack(side="left", fill="x", expand=True)
         ttk.Button(l_btns, text="Borrar", command=self.delete_variable).pack(side="left", fill="x", expand=True)
 
@@ -95,12 +142,18 @@ class NitrogenGUI:
         control_frame = ttk.LabelFrame(self.root, text="3. Control", padding=10)
         control_frame.pack(fill="both", expand=True, padx=10, pady=5)
         
-        self.btn_start = ttk.Button(control_frame, text="▶ INICIAR SIMULACIÓN", command=self.start_simulation)
+        # Frame para los botones (arriba)
+        buttons_frame = ttk.Frame(control_frame)
+        buttons_frame.pack(fill="x", pady=(0, 5))
+        
+        self.btn_start = ttk.Button(buttons_frame, text="▶ INICIAR SIMULACIÓN", command=self.start_simulation)
         self.btn_start.pack(side="left", padx=5)
-        self.btn_stop = ttk.Button(control_frame, text="⏹ DETENER", command=self.stop_simulation, state="disabled")
+        self.btn_stop = ttk.Button(buttons_frame, text="⏹ DETENER", command=self.stop_simulation, state="disabled")
         self.btn_stop.pack(side="left", padx=5)
         
-        self.log_area = tk.Text(control_frame, height=8, bg="#222", fg="#0f0"); self.log_area.pack(fill="both", expand=True, pady=5)
+        # Consola de logs (abajo)
+        self.log_area = tk.Text(control_frame, height=8, bg="#222", fg="#0f0")
+        self.log_area.pack(fill="both", expand=True)
 
     # --- GESTIÓN DINÁMICA CONEXIÓN ---
     def _toggle_conn_options(self, event=None):
@@ -177,6 +230,8 @@ class NitrogenGUI:
         elif sel == "Texto": self._show_string_options()
         elif sel == "Lista": self._show_list_options()
         elif sel == "Fecha": self._show_date_options()
+        elif sel == "Punto": self._show_point_options()
+        elif sel == "Booleano": self._show_boolean_options()
 
     def _show_numeric_options(self):
         # AÑADIDO: 'trend' a la lista de estrategias
@@ -259,6 +314,100 @@ class NitrogenGUI:
         e=ttk.Entry(self.options_frame); e.insert(0,"%H:%M:%S"); e.pack(); self.dynamic_widgets["fmt"]=e
         c=ttk.Combobox(self.options_frame, values=["now","increment"]); c.current(0); c.pack(); self.dynamic_widgets["strat"]=c
 
+    def _show_point_options(self):
+        # Selector Dimensiones
+        ttk.Label(self.options_frame, text="Dimensión:").pack()
+        c_dim = ttk.Combobox(self.options_frame, values=["2D", "3D"], state="readonly")
+        c_dim.current(1) # 3D por defecto
+        c_dim.pack()
+        self.dynamic_widgets["dim"] = c_dim
+
+        # Frame para rangos
+        f_r = ttk.Frame(self.options_frame)
+        f_r.pack(pady=5)
+
+        # Rango X
+        ttk.Label(f_r, text="X (Min-Max):").grid(row=0, column=0)
+        ex1=ttk.Entry(f_r, width=5); ex1.insert(0,"0"); ex1.grid(row=0, column=1)
+        ex2=ttk.Entry(f_r, width=5); ex2.insert(0,"100"); ex2.grid(row=0, column=2)
+        self.dynamic_widgets["x_min"] = ex1; self.dynamic_widgets["x_max"] = ex2
+
+        # Rango Y
+        ttk.Label(f_r, text="Y (Min-Max):").grid(row=1, column=0)
+        ey1=ttk.Entry(f_r, width=5); ey1.insert(0,"0"); ey1.grid(row=1, column=1)
+        ey2=ttk.Entry(f_r, width=5); ey2.insert(0,"100"); ey2.grid(row=1, column=2)
+        self.dynamic_widgets["y_min"] = ey1; self.dynamic_widgets["y_max"] = ey2
+
+        # Rango Z (guardamos referencias a los widgets para poder ocultarlos/mostrarlos)
+        z_label = ttk.Label(f_r, text="Z (Min-Max):")
+        z_label.grid(row=2, column=0)
+        ez1=ttk.Entry(f_r, width=5); ez1.insert(0,"0"); ez1.grid(row=2, column=1)
+        ez2=ttk.Entry(f_r, width=5); ez2.insert(0,"100"); ez2.grid(row=2, column=2)
+        self.dynamic_widgets["z_min"] = ez1
+        self.dynamic_widgets["z_max"] = ez2
+        self.dynamic_widgets["z_label"] = z_label
+
+        # Función para mostrar/ocultar Z según dimensión
+        def toggle_z_axis(event=None):
+            dim = c_dim.get()
+            if dim == "2D":
+                # Ocultar widgets de Z
+                z_label.grid_remove()
+                ez1.grid_remove()
+                ez2.grid_remove()
+            else:
+                # Mostrar widgets de Z
+                z_label.grid()
+                ez1.grid()
+                ez2.grid()
+        
+        # Vincular evento y ejecutar al inicio
+        c_dim.bind("<<ComboboxSelected>>", toggle_z_axis)
+        toggle_z_axis()
+
+        # Estrategia y Paso
+        ttk.Label(self.options_frame, text="Estrategia:").pack()
+        c_st = ttk.Combobox(self.options_frame, values=["random", "trend"])
+        c_st.current(0); c_st.pack()
+        self.dynamic_widgets["strat"] = c_st
+        
+        ttk.Label(self.options_frame, text="Paso (Speed):").pack()
+        e_sp = ttk.Entry(self.options_frame, width=5); e_sp.insert(0, "1.0"); e_sp.pack()
+        self.dynamic_widgets["step"] = e_sp
+
+    def _show_boolean_options(self):
+        ttk.Label(self.options_frame, text="Estrategia:").pack(anchor="w")
+        c_strat = ttk.Combobox(self.options_frame, values=["random", "alternating", "constant"], state="readonly")
+        c_strat.current(0)
+        c_strat.pack(fill="x", pady=2)
+        self.dynamic_widgets["strat"] = c_strat
+
+        # Panel para opciones dinámicas según estrategia
+        sub_frame = ttk.Frame(self.options_frame)
+        sub_frame.pack(fill="x", pady=5)
+
+        def update_sub_options(event=None):
+            for w in sub_frame.winfo_children(): w.destroy()
+            strat = c_strat.get()
+            
+            if strat == "random":
+                ttk.Label(sub_frame, text="Probabilidad True (%):").pack(side="left")
+                e_prob = ttk.Entry(sub_frame, width=5)
+                e_prob.insert(0, "50")
+                e_prob.pack(side="left", padx=5)
+                self.dynamic_widgets["true_prob"] = e_prob
+            else:
+                # Para constant o alternating (valor inicial)
+                lbl = "Valor Fijo:" if strat == "constant" else "Valor Inicial:"
+                ttk.Label(sub_frame, text=lbl).pack(side="left")
+                c_val = ttk.Combobox(sub_frame, values=["True", "False"], state="readonly", width=8)
+                c_val.current(0)
+                c_val.pack(side="left", padx=5)
+                self.dynamic_widgets["init_val"] = c_val
+
+        c_strat.bind("<<ComboboxSelected>>", update_sub_options)
+        update_sub_options() # Ejecutar al inicio
+
     # --- LÓGICA DE SIMULACIÓN ---
     def add_or_update_variable(self):
         name = self.entry_var_name.get()
@@ -325,6 +474,39 @@ class NitrogenGUI:
                 st = self.dynamic_widgets["strat"].get()
                 var = DateVariable(name, strategy=st, date_format=fmt, anomaly_prob=a_prob, anomaly_value=a_val)
                 desc = f"{name} [Date]"
+
+            elif v_type == "Punto":
+                dim_str = self.dynamic_widgets["dim"].get()
+                dim = 2 if dim_str == "2D" else 3
+                
+                xr = (float(self.dynamic_widgets["x_min"].get()), float(self.dynamic_widgets["x_max"].get()))
+                yr = (float(self.dynamic_widgets["y_min"].get()), float(self.dynamic_widgets["y_max"].get()))
+                zr = (float(self.dynamic_widgets["z_min"].get()), float(self.dynamic_widgets["z_max"].get()))
+                
+                st = self.dynamic_widgets["strat"].get()
+                step = float(self.dynamic_widgets["step"].get())
+                
+                var = PointVariable(name, dimension=dim, x_range=xr, y_range=yr, z_range=zr, 
+                                    strategy=st, step=step, anomaly_prob=a_prob, anomaly_value=a_val)
+                desc = f"{name} [Punto {dim}D]"
+            
+            elif v_type == "Booleano":
+                strat = self.dynamic_widgets["strat"].get()
+                prob = 50.0
+                init_val = True
+                
+                if strat == "random":
+                    prob = float(self.dynamic_widgets["true_prob"].get())
+                else:
+                    init_val = (self.dynamic_widgets["init_val"].get() == "True")
+                
+                var = BooleanVariable(name, strategy=strat, true_prob=prob, initial_value=init_val,
+                                      anomaly_prob=a_prob, anomaly_value=a_val)
+                
+                if strat == "random":
+                    desc = f"{name} [Bool: {prob}% True]"
+                else:
+                    desc = f"{name} [Bool: {strat}]"
 
             if self.editing_index is None:
                 self.added_variables.append(var)
@@ -417,6 +599,50 @@ class NitrogenGUI:
             self.dynamic_widgets["fmt"].insert(0, var.date_format)
             self.dynamic_widgets["strat"].set(var.strategy)
 
+        elif isinstance(var, PointVariable):
+            self.combo_type.set("Punto")
+            self._update_dynamic_options()
+            
+            # Cargar Dimensión
+            dim_str = "3D" if var.dimension == 3 else "2D"
+            self.dynamic_widgets["dim"].set(dim_str)
+            
+            # Forzar actualización visual 2D/3D 
+            self.dynamic_widgets["dim"].event_generate("<<ComboboxSelected>>")
+            self.root.update_idletasks()
+
+            self.dynamic_widgets["strat"].set(var.strategy)
+            self.dynamic_widgets["step"].delete(0, tk.END); self.dynamic_widgets["step"].insert(0, str(var.step))
+            
+            # Rangos
+            self.dynamic_widgets["x_min"].delete(0, tk.END); self.dynamic_widgets["x_min"].insert(0, str(var.x_range[0]))
+            self.dynamic_widgets["x_max"].delete(0, tk.END); self.dynamic_widgets["x_max"].insert(0, str(var.x_range[1]))
+            
+            self.dynamic_widgets["y_min"].delete(0, tk.END); self.dynamic_widgets["y_min"].insert(0, str(var.y_range[0]))
+            self.dynamic_widgets["y_max"].delete(0, tk.END); self.dynamic_widgets["y_max"].insert(0, str(var.y_range[1]))
+            
+            self.dynamic_widgets["z_min"].delete(0, tk.END); self.dynamic_widgets["z_min"].insert(0, str(var.z_range[0]))
+            self.dynamic_widgets["z_max"].delete(0, tk.END); self.dynamic_widgets["z_max"].insert(0, str(var.z_range[1]))
+
+        elif isinstance(var, BooleanVariable):
+            self.combo_type.set("Booleano")
+            self._update_dynamic_options()
+            
+            self.dynamic_widgets["strat"].set(var.strategy)
+            self.dynamic_widgets["strat"].event_generate("<<ComboboxSelected>>") # Forzar refresco visual
+            self.root.update_idletasks()
+            
+            if var.strategy == "random":
+                self.dynamic_widgets["true_prob"].delete(0, tk.END)
+                self.dynamic_widgets["true_prob"].insert(0, str(var.true_prob))
+            else:
+                val_str = "True" if var.current_value else "False"
+                # Pequeño truco para recuperar el valor inicial en alternating
+                if var.strategy == "alternating": 
+                     # Como alternating invierte, el valor "inicial" visual es el inverso del actual guardado
+                     # o simplemente mostramos el estado actual como punto de partida
+                     pass 
+                self.dynamic_widgets["init_val"].set(val_str)
 
     def cancel_edit(self):
         self.editing_index = None
