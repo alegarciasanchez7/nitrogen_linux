@@ -2,7 +2,7 @@
 Gestor de simulación - Inicia y detiene la simulación
 """
 import threading
-from nitrogen_linux import NitrogenEngine, Group
+from core import NitrogenEngine, Group
 from connectors import MqttConnector, FileConnector, AmqpConnector
 
 
