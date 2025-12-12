@@ -1,5 +1,6 @@
 import time
-from variables_type import NumericVariable, StringVariable
+from datetime import datetime
+from variables_type import NumericVariable, StringVariable, ListVariable, DateVariable
 
 # --- CLASE CONECTOR (Simulando Sección 3.3) ---
 
@@ -98,31 +99,38 @@ if __name__ == "__main__":
     token_var = StringVariable("SessionToken", min_len=15, max_len=20, 
                                use_upper=True, use_lower=True, 
                                use_nums=True, use_sym=True)
+    
+    # TIPO LISTA: Días de la semana secuenciales [cite: 407]
+    dias = ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"]
+    dia_var = ListVariable("DiaSemana", dias, strategy="serial", step=1)
+
+    # TIPO LISTA: Estado del sistema (Aleatorio con pesos simulados por repetición)
+    estados = ["OK", "OK", "OK", "WARNING", "ERROR"] 
+    estado_var = ListVariable("Status", estados, strategy="random")
+
+    # TIPO FECHA: Timestamp incremental (simulando datos históricos)
+    # Empieza el 1 de Enero de 2024 y avanza 1 hora por cada tick
+    inicio = datetime(2024, 1, 1, 8, 0, 0)
+    fecha_var = DateVariable("Timestamp", strategy="increment", 
+                             base_date=inicio, increment_seconds=3600)
 
     # --- CONECTOR ---
-    
-    # Creamos una plantilla JSON más compleja simulando un dispositivo IoT real
+
     plantilla = (
-        '{'
-        '  "device": "{SerialNum}", '
-        '  "auth": "{SessionToken}", '
-        '  "payload": {'
-        '     "temp": {Temperatura}, '
-        '     "unit": "Celsius"'
-        '  }'
-        '}'
+        'DATA | {Timestamp} | Dia: {DiaSemana} | Temp: {Temperatura} C | Estado: {Status}'
     )
     
-    connector_iot = Connector("Envio_IoT_Seguro", plantilla)
+    connector_log = Connector("Log_Diario", plantilla)
     
     # Registramos las variables en el conector
-    connector_iot.add_variable(temp_var)
-    connector_iot.add_variable(serial_var) # Añadimos la nueva variable string
-    connector_iot.add_variable(token_var)  # Añadimos el token variable
+    connector_log.add_variable(temp_var)
+    connector_log.add_variable(dia_var)
+    connector_log.add_variable(estado_var)
+    connector_log.add_variable(fecha_var)
 
     # --- GRUPO Y ARRANQUE ---
     grupo_sensores = Group("Sensores_Planta_1")
-    grupo_sensores.add_connector(connector_iot)
+    grupo_sensores.add_connector(connector_log)
 
     engine.add_group(grupo_sensores)
     engine.start()
