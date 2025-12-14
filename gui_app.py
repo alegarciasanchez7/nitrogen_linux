@@ -4,6 +4,7 @@ from tkinter import ttk
 # Importar componentes GUI
 from gui_components.components import ConnectionConfigPanel, VariableDesignerPanel, ControlPanel, EventsListPanel
 from gui_components.functions import VariableHandlers, SimulationManager
+from gui_components.functions.config_manager import ConfigManager
 
 
 class NitrogenGUI:
@@ -16,6 +17,28 @@ class NitrogenGUI:
         style.theme_use('clam')
         
         self._init_ui()
+        
+        # --- NUEVO: Inicializar Gestor de Configuración ---
+        self.config_manager = ConfigManager(
+            self.root, 
+            self.conn_config, 
+            self.events_panel, 
+            self.var_designer
+        )
+        # --- NUEVO: Crear Menú Superior ---
+        self._create_menu()
+    
+    def _create_menu(self):
+        menubar = tk.Menu(self.root)
+        self.root.config(menu=menubar)
+        
+        file_menu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="Archivo", menu=file_menu)
+        
+        file_menu.add_command(label="💾 Guardar Configuración", command=self.config_manager.save_configuration)
+        file_menu.add_command(label="📂 Cargar Configuración", command=self.config_manager.load_configuration)
+        file_menu.add_separator()
+        file_menu.add_command(label="Salir", command=self.root.quit)
     
     def _init_ui(self):
         """Inicializa la interfaz de usuario con soporte multi-evento"""

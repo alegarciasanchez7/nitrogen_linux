@@ -111,3 +111,26 @@ class ConnectionConfigPanel:
             "frequency": int(self.entry_freq.get()),
             "options": self.widgets_conn
         }
+
+    def set_config(self, config_data):
+        """Restaura la configuración visual desde un diccionario de datos"""
+        # 1. Tipo de Conector
+        conn_type = config_data.get("type", "RabbitMQ")
+        self.combo_conn_type.set(conn_type)
+        
+        # 2. Forzar actualización de la vista (mostrar los campos correctos)
+        self._toggle_conn_options()
+        
+        # 3. Frecuencia Global
+        self.entry_freq.delete(0, tk.END)
+        self.entry_freq.insert(0, str(config_data.get("frequency", 1000)))
+        
+        # 4. Rellenar Opciones Dinámicas (Host, Port, Topic, etc.)
+        options = config_data.get("options", {})
+        
+        # self.widgets_conn contiene las referencias a los Entries actuales
+        for key, value in options.items():
+            if key in self.widgets_conn:
+                entry_widget = self.widgets_conn[key]
+                entry_widget.delete(0, tk.END)
+                entry_widget.insert(0, str(value))
