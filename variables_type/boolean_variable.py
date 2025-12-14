@@ -12,12 +12,12 @@ class BooleanVariable(Variable):
         
         self.strategy = strategy # "random", "alternating", "constant"
         self.true_prob = true_prob # Probabilidad de True (0-100)
+        self.initial_value = initial_value
         
         # Para strategy "constant" o inicio de "alternating"
         self.current_value = initial_value 
         
         # Para alternating, necesitamos saber el estado anterior
-        # Invertimos el inicial para que la primera llamada devuelva el valor esperado
         if strategy == "alternating":
             self.current_value = not initial_value
 
@@ -36,7 +36,7 @@ class BooleanVariable(Variable):
             self.current_value = not self.current_value
             
         elif self.strategy == "constant":
-            # No hace nada, mantiene el valor inicial
+            # Mantiene el valor inicial
             pass
             
         return self.current_value

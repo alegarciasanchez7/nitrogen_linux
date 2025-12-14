@@ -7,26 +7,49 @@ from ..functions.variable_options import VariableOptions
 
 
 class VariableDesignerPanel:
-    def __init__(self, parent, root):
+    def __init__(self, parent, root, on_event_update_callback):
         self.parent = parent
         self.root = root
+        self.on_event_update = on_event_update_callback # Para notificar a la lista que refresque nombre/frec
+        self.current_event = None
         self.dynamic_widgets = {}
         
         # Frame principal
-        self.frame = ttk.LabelFrame(parent, text="2. Diseñador de Variables", padding=10)
+        self.frame = ttk.LabelFrame(parent, text="3. Diseñador de Variables (Evento Seleccionado)", padding=10)
         
-        self._create_scrollable_form()
-        self._create_variable_list()
+        # --- CABECERA DE CONFIGURACIÓN DE EVENTO (Nombre y Frec) ---
+        self.header_frame = ttk.Frame(self.frame)
+        self.header_frame.pack(fill="x", pady=(0, 10))
         
-        # Módulo de opciones dinámicas
+        ttk.Label(self.header_frame, text="Nombre Evento:").pack(side="left")
+        self.entry_evt_name = ttk.Entry(self.header_frame)
+        self.entry_evt_name.pack(side="left", padx=5)
+        self.entry_evt_name.bind("<KeyRelease>", self._save_header_changes)
+        
+        ttk.Label(self.header_frame, text="Freq (ms):").pack(side="left")
+        self.entry_evt_freq = ttk.Entry(self.header_frame, width=8)
+        self.entry_evt_freq.pack(side="left", padx=5)
+        self.entry_evt_freq.bind("<KeyRelease>", self._save_header_changes)
+        # -----------------------------------------
+
+        # Frame de Contenido (Oculto cuando no hay evento seleccionado)
+        self.content_frame = ttk.Frame(self.frame)
+        self.content_frame.pack(fill="both", expand=True)
+
+        self._create_scrollable_form(self.content_frame) # Pasamos content_frame
+        self._create_variable_list(self.content_frame)   # Pasamos content_frame
+        
         self.var_options = VariableOptions(self.options_frame, self.dynamic_widgets, root)
+        
+        # Iniciar oculto/deshabilitado
+        self._set_state("disabled")
     
     def pack(self, **kwargs):
         self.frame.pack(**kwargs)
     
-    def _create_scrollable_form(self):
+    def _create_scrollable_form(self, parent_frame):
         """Crea el formulario con scroll en el lado izquierdo"""
-        left_container = ttk.Frame(self.frame, width=400)
+        left_container = ttk.Frame(parent_frame, width=400)
         left_container.pack(side="left", fill="y", padx=5)
         
         # Elevar el contenedor para que esté por encima
@@ -113,9 +136,9 @@ class VariableDesignerPanel:
         )
         self.btn_cancel.pack(side="right")
     
-    def _create_variable_list(self):
+    def _create_variable_list(self, parent_frame):
         """Crea la lista de variables en el lado derecho"""
-        list_frame = ttk.Frame(self.frame)
+        list_frame = ttk.Frame(parent_frame)
         list_frame.pack(side="right", fill="both", expand=True, padx=5)
         
         # Elevar este frame por encima del formulario
@@ -142,3 +165,62 @@ class VariableDesignerPanel:
         sel = self.combo_type.get()
         self.var_options.dynamic_widgets = self.dynamic_widgets
         self.var_options.show_options(sel)
+
+    def load_event(self, event_config):
+        """Carga un evento en el diseñador"""
+        self.current_event = event_config
+        
+        if event_config is None:
+            self._set_state("disabled")
+            self._clear_header()
+            self.vars_listbox.delete(0, tk.END)
+            return
+
+        self._set_state("normal")
+        
+        # Cargar Cabecera
+        self.entry_evt_name.delete(0, tk.END)
+        self.entry_evt_name.insert(0, event_config.name)
+        self.entry_evt_freq.delete(0, tk.END)
+        self.entry_evt_freq.insert(0, str(event_config.frequency))
+        
+        # Cargar Lista de Variables
+        self.vars_listbox.delete(0, tk.END)
+        for var in event_config.variables:
+            # Construimos una descripción simple
+            self.vars_listbox.insert(tk.END, f"{var.name} [{type(var).__name__}]")
+
+    def _save_header_changes(self, event=None):
+        """Guarda cambios de Nombre/Frec al instante"""
+        if not self.current_event: return
+        
+        self.current_event.name = self.entry_evt_name.get()
+        try:
+            self.current_event.frequency = int(self.entry_evt_freq.get())
+        except:
+            pass # Ignorar enteros inválidos mientras se escribe
+            
+        if self.on_event_update:
+            self.on_event_update()
+
+    def _set_state(self, state):
+        """Habilita/Deshabilita inputs"""
+        state_val = "normal" if state == "normal" else "disabled"
+        # Deshabilitar inputs de cabecera
+        self.entry_evt_name.config(state=state_val)
+        self.entry_evt_freq.config(state=state_val)
+        
+        # Ocultar/Mostrar contenido
+        if state == "normal":
+            self.content_frame.pack(fill="both", expand=True)
+        else:
+            self.content_frame.pack_forget()
+
+    def _clear_header(self):
+        self.entry_evt_name.config(state="normal")
+        self.entry_evt_name.delete(0, tk.END)
+        self.entry_evt_name.config(state="disabled")
+        
+        self.entry_evt_freq.config(state="normal")
+        self.entry_evt_freq.delete(0, tk.END)
+        self.entry_evt_freq.config(state="disabled")

@@ -9,7 +9,6 @@ from variables_type import NumericVariable, StringVariable, ListVariable, DateVa
 class VariableHandlers:
     def __init__(self, designer_panel):
         self.designer = designer_panel
-        self.added_variables = []
         self.editing_index = None
         
         # Conectar botones
@@ -20,31 +19,48 @@ class VariableHandlers:
         self.designer.vars_listbox.bind('<Double-Button-1>', lambda e: self.edit_selected_variable())
     
     def add_or_update_variable(self):
-        """Añade o actualiza una variable"""
+        """Añade o actualiza una variable en el evento seleccionado"""
+        if not self.designer.current_event:
+            messagebox.showwarning("Atención", "Primero crea o selecciona un evento.")
+            return
+
         name = self.designer.entry_var_name.get()
         if not name:
+            messagebox.showerror("Error", "El nombre de la variable es obligatorio")
             return
         
         try:
             v_type = self.designer.combo_type.get()
-            a_prob = float(self.designer.entry_anomaly_prob.get())
+            
+            # Obtener datos de anomalía (con manejo de errores si está vacío)
+            try:
+                a_prob = float(self.designer.entry_anomaly_prob.get())
+            except ValueError:
+                a_prob = 0.0
             a_val = self.designer.entry_anomaly_val.get()
             
+            # Crear la variable usando el método auxiliar existente
             var, desc = self._create_variable(v_type, name, a_prob, a_val)
             
+            # Lógica de Guardado:
             if self.editing_index is None:
-                self.added_variables.append(var)
+                # --- MODO NUEVO: AÑADIR AL EVENTO ACTUAL ---
+                self.designer.current_event.variables.append(var)
                 self.designer.vars_listbox.insert(tk.END, desc)
                 self.designer.entry_var_name.delete(0, tk.END)
             else:
-                self.added_variables[self.editing_index] = var
+                # --- MODO EDICIÓN: ACTUALIZAR EN EL EVENTO ACTUAL ---
+                self.designer.current_event.variables[self.editing_index] = var
+                
+                # Refrescar lista visualmente
                 self.designer.vars_listbox.config(state="normal")
                 self.designer.vars_listbox.delete(self.editing_index)
                 self.designer.vars_listbox.insert(self.editing_index, desc)
-                self.cancel_edit()
+                
+                self.cancel_edit() # Salir del modo edición
         
         except Exception as e:
-            messagebox.showerror("Error", str(e))
+            messagebox.showerror("Error creando variable", str(e))
     
     def _create_variable(self, v_type, name, a_prob, a_val):
         """Crea una variable según su tipo"""
@@ -136,16 +152,19 @@ class VariableHandlers:
         return var, desc
     
     def edit_selected_variable(self):
-        """Edita la variable seleccionada"""
+        """Carga la variable seleccionada del evento actual para editarla"""
         sel = self.designer.vars_listbox.curselection()
-        if not sel:
+        
+        # Comprobar que hay selección Y que hay un evento cargado
+        if not sel or not self.designer.current_event:
             return
         
         index = sel[0]
-        var = self.added_variables[index]
+        # OBTENER LA VARIABLE DESDE EL EVENTO ACTUAL
+        var = self.designer.current_event.variables[index]
         self.editing_index = index
         
-        # Ajustar UI
+        # Ajustar UI al modo edición
         self.designer.btn_add_update.config(text="💾 Guardar Cambios")
         self.designer.btn_cancel.config(state="normal")
         self.designer.vars_listbox.config(state="disabled")
@@ -160,7 +179,7 @@ class VariableHandlers:
         self.designer.entry_anomaly_val.delete(0, tk.END)
         self.designer.entry_anomaly_val.insert(0, str(var.anomaly_value))
         
-        # Rellenar según tipo
+        # Rellenar campos específicos (llama a tu método auxiliar existente)
         self._fill_variable_fields(var)
     
     def _fill_variable_fields(self, var):
@@ -272,8 +291,17 @@ class VariableHandlers:
         self.designer.entry_var_name.delete(0, tk.END)
     
     def delete_variable(self):
-        """Elimina la variable seleccionada"""
+        """Elimina la variable seleccionada del evento actual"""
         sel = self.designer.vars_listbox.curselection()
-        if sel:
-            self.designer.vars_listbox.delete(sel[0])
-            del self.added_variables[sel[0]]
+        if sel and self.designer.current_event:
+            idx = sel[0]
+            
+            # Borrar de la lista visual
+            self.designer.vars_listbox.delete(idx)
+            
+            # BORRAR DEL EVENTO ACTUAL (Lógica de datos)
+            del self.designer.current_event.variables[idx]
+            
+            # Si estábamos editando esta variable, cancelar edición
+            if self.editing_index == idx:
+                self.cancel_edit()
