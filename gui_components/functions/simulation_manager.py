@@ -85,8 +85,11 @@ class SimulationManager:
         
         elif conn_type == "RabbitMQ":
             host = options["host"].get()
+            port = options["port"].get()
+            user = options["user"].get()
+            password = options["password"].get()
             queue = options["queue"].get() 
-            return AmqpConnector(event_name, template, host=host, queue=queue, on_message_callback=self.control.log)
+            return AmqpConnector(event_name, template, host=host, port=port, user=user, password=password, queue=queue, on_message_callback=self.control.log)
         
         else:
             path = options["filepath"].get()

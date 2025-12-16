@@ -54,14 +54,38 @@ class ConnectionConfigPanel:
             self._show_file_options()
     
     def _show_amqp_options(self):
-        ttk.Label(self.conn_options_frame, text="Host:").pack(side="left")
-        e_h = ttk.Entry(self.conn_options_frame, width=15)
+        
+        # 1. Host
+        ttk.Label(self.conn_options_frame, text="Host:").pack(side="left", padx=(0, 2))
+        e_h = ttk.Entry(self.conn_options_frame, width=12)
         e_h.insert(0, "localhost")
         e_h.pack(side="left", padx=2)
         self.widgets_conn["host"] = e_h
         
-        ttk.Label(self.conn_options_frame, text="Cola (Queue):").pack(side="left")
-        e_q = ttk.Entry(self.conn_options_frame, width=15)
+        # 2. Port
+        ttk.Label(self.conn_options_frame, text="Port:").pack(side="left", padx=(5, 2))
+        e_p = ttk.Entry(self.conn_options_frame, width=5)
+        e_p.insert(0, "5672")
+        e_p.pack(side="left", padx=2)
+        self.widgets_conn["port"] = e_p
+        
+        # 3. User
+        ttk.Label(self.conn_options_frame, text="User:").pack(side="left", padx=(5, 2))
+        e_u = ttk.Entry(self.conn_options_frame, width=8)
+        e_u.insert(0, "guest")
+        e_u.pack(side="left", padx=2)
+        self.widgets_conn["user"] = e_u
+
+        # 4. Pass
+        ttk.Label(self.conn_options_frame, text="Pass:").pack(side="left", padx=(5, 2))
+        e_pw = ttk.Entry(self.conn_options_frame, width=8, show="*")
+        e_pw.insert(0, "guest")
+        e_pw.pack(side="left", padx=2)
+        self.widgets_conn["password"] = e_pw
+        
+        # 5. Queue
+        ttk.Label(self.conn_options_frame, text="Cola:").pack(side="left", padx=(5, 2))
+        e_q = ttk.Entry(self.conn_options_frame, width=12)
         e_q.insert(0, "sensores_iot")
         e_q.pack(side="left", padx=2)
         self.widgets_conn["queue"] = e_q

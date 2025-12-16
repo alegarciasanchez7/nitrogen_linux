@@ -28,6 +28,13 @@ class ControlPanel:
             state="disabled"
         )
         self.btn_stop.pack(side="left", padx=5)
+
+        self.btn_clear = ttk.Button(
+            buttons_frame, 
+            text="LIMPIAR",
+            command=self.clear_console
+        )
+        self.btn_clear.pack(side="left", padx=5)
         
         # Consola de logs (abajo)
         self.log_area = tk.Text(self.frame, height=8, bg="#222", fg="#0f0")
@@ -40,3 +47,7 @@ class ControlPanel:
         """Añade un mensaje al log"""
         self.log_area.insert(tk.END, msg + "\n")
         self.log_area.see(tk.END)
+
+    def clear_console(self):
+        """Limpia la consola de logs"""
+        self.log_area.delete(1.0, tk.END)
