@@ -124,9 +124,14 @@ class ConnectionConfigPanel:
     
     def get_config(self):
         """Retorna la configuración actual"""
+        # Extraer los valores de los widgets, no los widgets mismos
+        options = {}
+        for key, widget in self.widgets_conn.items():
+            options[key] = widget.get()
+        
         return {
             "type": self.combo_conn_type.get(),
-            "options": self.widgets_conn
+            "options": options
         }
 
     def set_config(self, config_data):
