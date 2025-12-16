@@ -169,26 +169,34 @@ class VariableHandlers:
         self.designer.btn_cancel.config(state="normal")
         self.designer.vars_listbox.config(state="disabled")
         
-        # Rellenar campos comunes
-        self.designer.entry_var_name.delete(0, tk.END)
-        self.designer.entry_var_name.insert(0, var.name)
+        try:
+            # Rellenar campos comunes
+            self.designer.entry_var_name.delete(0, tk.END)
+            self.designer.entry_var_name.insert(0, var.name)
+            
+            self.designer.entry_anomaly_prob.delete(0, tk.END)
+            self.designer.entry_anomaly_prob.insert(0, str(var.anomaly_prob))
+            
+            self.designer.entry_anomaly_val.delete(0, tk.END)
+            self.designer.entry_anomaly_val.insert(0, str(var.anomaly_value))
+
+            # Rellenar campos específicos (llama a tu método auxiliar existente)
+            self._fill_variable_fields(var)
+
+        except Exception as e:
+            messagebox.showerror("Error al cargar variable", str(e))
+            self.cancel_edit()
         
-        self.designer.entry_anomaly_prob.delete(0, tk.END)
-        self.designer.entry_anomaly_prob.insert(0, str(var.anomaly_prob))
-        
-        self.designer.entry_anomaly_val.delete(0, tk.END)
-        self.designer.entry_anomaly_val.insert(0, str(var.anomaly_value))
-        
-        # Rellenar campos específicos (llama a tu método auxiliar existente)
-        self._fill_variable_fields(var)
     
     def _fill_variable_fields(self, var):
         """Rellena los campos según el tipo de variable"""
-        dw = self.designer.dynamic_widgets
-        
+        # IMPORTANTE: No definir dw aquí arriba, porque cambia al actualizar opciones.
+        vo = self.designer.var_options
+
         if isinstance(var, NumericVariable):
             self.designer.combo_type.set("Numérico")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             dw["min"].delete(0, tk.END)
             dw["min"].insert(0, str(var.min_val))
@@ -201,18 +209,17 @@ class VariableHandlers:
         elif isinstance(var, StringVariable):
             self.designer.combo_type.set("Texto")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             if var.strategy == "regex":
                 dw["str_mode"].set("Regex (Patrón)")
-                dw["str_mode"].event_generate("<<ComboboxSelected>>")
-                self.designer.root.update_idletasks()
+                vo.update_string_params() # Crear widgets del sub-panel
                 
                 dw["regex_pattern"].delete(0, tk.END)
                 dw["regex_pattern"].insert(0, var.pattern)
             else:
                 dw["str_mode"].set("Aleatorio")
-                dw["str_mode"].event_generate("<<ComboboxSelected>>")
-                self.designer.root.update_idletasks()
+                vo.update_string_params() # Crear widgets del sub-panel
                 
                 dw["min_len"].delete(0, tk.END)
                 dw["min_len"].insert(0, str(var.min_len))
@@ -225,6 +232,7 @@ class VariableHandlers:
         elif isinstance(var, ListVariable):
             self.designer.combo_type.set("Lista")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             text_val = ", ".join(var.values)
             dw["vals"].delete("1.0", tk.END)
@@ -234,6 +242,7 @@ class VariableHandlers:
         elif isinstance(var, DateVariable):
             self.designer.combo_type.set("Fecha")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             dw["fmt"].delete(0, tk.END)
             dw["fmt"].insert(0, var.date_format)
@@ -242,11 +251,11 @@ class VariableHandlers:
         elif isinstance(var, PointVariable):
             self.designer.combo_type.set("Punto")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             dim_str = "3D" if var.dimension == 3 else "2D"
             dw["dim"].set(dim_str)
-            dw["dim"].event_generate("<<ComboboxSelected>>")
-            self.designer.root.update_idletasks()
+            vo.update_point_params()
             
             dw["strat"].set(var.strategy)
             dw["step"].delete(0, tk.END)
@@ -270,10 +279,10 @@ class VariableHandlers:
         elif isinstance(var, BooleanVariable):
             self.designer.combo_type.set("Booleano")
             self.designer._update_dynamic_options()
+            dw = self.designer.dynamic_widgets  # <--- REFRESCAR REFERENCIA AQUÍ
             
             dw["strat"].set(var.strategy)
-            dw["strat"].event_generate("<<ComboboxSelected>>")
-            self.designer.root.update_idletasks()
+            vo.update_boolean_params()
             
             if var.strategy == "random":
                 dw["true_prob"].delete(0, tk.END)

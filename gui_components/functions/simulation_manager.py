@@ -35,8 +35,8 @@ class SimulationManager:
             # --- CONSTRUCCIÓN INTELIGENTE DEL JSON ---
             json_parts = []
             
-            # 1. Schema (Siempre con comillas)
-            json_parts.append(f'"schema": "{evt.name}"')
+            # 1. EventTypeName
+            json_parts.append(f'"EventTypeName": "{evt.name}"')
             
             # 2. Variables
             for v in evt.variables:
