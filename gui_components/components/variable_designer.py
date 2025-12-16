@@ -19,8 +19,7 @@ class VariableDesignerPanel:
         
         # --- CABECERA DE CONFIGURACIÓN DE EVENTO (Nombre y Frec) ---
         self.header_frame = ttk.Frame(self.frame)
-        self.header_frame.pack(fill="x", pady=(0, 10))
-        
+
         ttk.Label(self.header_frame, text="Nombre Evento:").pack(side="left")
         self.entry_evt_name = ttk.Entry(self.header_frame)
         self.entry_evt_name.pack(side="left", padx=5)
@@ -32,17 +31,16 @@ class VariableDesignerPanel:
         self.entry_evt_freq.bind("<KeyRelease>", self._save_header_changes)
         # -----------------------------------------
 
-        # Frame de Contenido (Oculto cuando no hay evento seleccionado)
+        # Frame de Contenido (Formulario y Lista)
         self.content_frame = ttk.Frame(self.frame)
-        self.content_frame.pack(fill="both", expand=True)
-
-        self._create_scrollable_form(self.content_frame) # Pasamos content_frame
-        self._create_variable_list(self.content_frame)   # Pasamos content_frame
+        
+        self._create_scrollable_form(self.content_frame)
+        self._create_variable_list(self.content_frame)   
         
         self.var_options = VariableOptions(self.options_frame, self.dynamic_widgets, root)
         
-        # Iniciar oculto/deshabilitado
-        self._set_state("disabled")
+        # Iniciar todo oculto
+        self.load_event(None)
     
     def pack(self, **kwargs):
         self.frame.pack(**kwargs)
@@ -167,16 +165,26 @@ class VariableDesignerPanel:
         self.var_options.show_options(sel)
 
     def load_event(self, event_config):
-        """Carga un evento en el diseñador"""
+        """Carga un evento en el diseñador o limpia la vista si es None"""
         self.current_event = event_config
         
         if event_config is None:
-            self._set_state("disabled")
+            # OCULTAR
+            self.header_frame.pack_forget()
+            self.content_frame.pack_forget()
+            
+            # Limpiar datos residuales
             self._clear_header()
             self.vars_listbox.delete(0, tk.END)
             return
 
-        self._set_state("normal")
+        # MOSTRAR
+        self.header_frame.pack(fill="x", pady=(0, 10))
+        self.content_frame.pack(fill="both", expand=True)
+        
+        # Habilitar inputs
+        self.entry_evt_name.config(state="normal")
+        self.entry_evt_freq.config(state="normal")
         
         # Cargar Cabecera
         self.entry_evt_name.delete(0, tk.END)
@@ -203,24 +211,10 @@ class VariableDesignerPanel:
         if self.on_event_update:
             self.on_event_update()
 
-    def _set_state(self, state):
-        """Habilita/Deshabilita inputs"""
-        state_val = "normal" if state == "normal" else "disabled"
-        # Deshabilitar inputs de cabecera
-        self.entry_evt_name.config(state=state_val)
-        self.entry_evt_freq.config(state=state_val)
-        
-        # Ocultar/Mostrar contenido
-        if state == "normal":
-            self.content_frame.pack(fill="both", expand=True)
-        else:
-            self.content_frame.pack_forget()
-
     def _clear_header(self):
+        """Limpia los campos de cabecera de forma segura"""
         self.entry_evt_name.config(state="normal")
         self.entry_evt_name.delete(0, tk.END)
-        self.entry_evt_name.config(state="disabled")
         
         self.entry_evt_freq.config(state="normal")
         self.entry_evt_freq.delete(0, tk.END)
-        self.entry_evt_freq.config(state="disabled")

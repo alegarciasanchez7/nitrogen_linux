@@ -29,12 +29,6 @@ class ConnectionConfigPanel:
         self.conn_options_frame = ttk.Frame(self.frame)
         self.conn_options_frame.grid(row=0, column=2, columnspan=4, sticky="w")
         
-        # Frecuencia
-        ttk.Label(self.frame, text="Freq (ms):").grid(row=0, column=6, padx=5)
-        self.entry_freq = ttk.Entry(self.frame, width=8)
-        self.entry_freq.insert(0, "1000")
-        self.entry_freq.grid(row=0, column=7, padx=5)
-        
         self._toggle_conn_options()
     
     def pack(self, **kwargs):
@@ -132,7 +126,6 @@ class ConnectionConfigPanel:
         """Retorna la configuración actual"""
         return {
             "type": self.combo_conn_type.get(),
-            "frequency": int(self.entry_freq.get()),
             "options": self.widgets_conn
         }
 
@@ -145,11 +138,7 @@ class ConnectionConfigPanel:
         # 2. Forzar actualización de la vista (mostrar los campos correctos)
         self._toggle_conn_options()
         
-        # 3. Frecuencia Global
-        self.entry_freq.delete(0, tk.END)
-        self.entry_freq.insert(0, str(config_data.get("frequency", 1000)))
-        
-        # 4. Rellenar Opciones Dinámicas (Host, Port, Topic, etc.)
+        # 3. Rellenar Opciones Dinámicas (Host, Port, Topic, etc.)
         options = config_data.get("options", {})
         
         # self.widgets_conn contiene las referencias a los Entries actuales
