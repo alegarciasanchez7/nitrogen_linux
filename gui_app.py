@@ -16,32 +16,37 @@ class NitrogenGUI:
         style = ttk.Style()
         style.theme_use('clam')
         
+        # Inicializar UI
         self._init_ui()
         
-        # --- NUEVO: Inicializar Gestor de Configuración ---
+        # --- Inicializar Gestor de Configuración ---
+        # NOTA: Solo pasamos los paneles que tienen datos (Conexión y Lista de Eventos)
         self.config_manager = ConfigManager(
-            self.root, 
             self.conn_config, 
-            self.events_panel, 
-            self.var_designer
+            self.events_panel
         )
-        # --- NUEVO: Crear Menú Superior ---
-        self._create_menu()
-    
-    def _create_menu(self):
-        menubar = tk.Menu(self.root)
-        self.root.config(menu=menubar)
         
-        file_menu = tk.Menu(menubar, tearoff=0)
-        menubar.add_cascade(label="Archivo", menu=file_menu)
-        
-        file_menu.add_command(label="💾 Guardar Configuración", command=self.config_manager.save_configuration)
-        file_menu.add_command(label="📂 Cargar Configuración", command=self.config_manager.load_configuration)
-        file_menu.add_separator()
-        file_menu.add_command(label="Salir", command=self.root.quit)
+        # --- Conectar los botones de Archivo ---
+        # Lo hacemos aquí porque self.config_manager ya existe
+        self.btn_load.config(command=self.config_manager.load_configuration)
+        self.btn_save.config(command=self.config_manager.save_configuration)
     
     def _init_ui(self):
         """Inicializa la interfaz de usuario con soporte multi-evento"""
+        
+        # --- 0. PANEL SUPERIOR (ARCHIVO) ---
+        # Creamos la barra de botones arriba del todo
+        top_bar = ttk.Frame(self.root)
+        top_bar.pack(fill="x", padx=10, pady=(10, 5))
+        
+        # Botones (sin comando todavía)
+        self.btn_load = ttk.Button(top_bar, text="Cargar Configuración")
+        self.btn_load.pack(side="left", padx=(0, 5))
+        
+        self.btn_save = ttk.Button(top_bar, text="Guardar Configuración")
+        self.btn_save.pack(side="left", padx=5)
+        # -----------------------------------
+
         # 1. Panel de configuración de conexión (Arriba)
         self.conn_config = ConnectionConfigPanel(self.root)
         self.conn_config.pack(fill="x", padx=10, pady=5)
@@ -53,14 +58,14 @@ class NitrogenGUI:
         # --- Panel Izquierdo: Lista de Eventos ---
         left_pane = ttk.Frame(middle_frame, width=280)
         left_pane.pack(side="left", fill="y", padx=(0, 5))
-        # Forzamos que mantenga su ancho fijo para que no se colapse
-        left_pane.pack_propagate(False)
+        left_pane.pack_propagate(False) # Forzar ancho fijo
 
         # --- Panel Derecho: Diseñador de Variables ---
+        # Creamos primero el diseñador porque events_panel lo necesita para el callback
         self.var_designer = VariableDesignerPanel(
             middle_frame, 
             self.root,
-            on_event_update_callback=lambda: self.events_panel.update_current_event_display()
+            on_event_update_callback=self._on_event_update # Usamos un método wrapper
         )
         self.var_designer.pack(side="right", fill="both", expand=True)
 
@@ -76,17 +81,19 @@ class NitrogenGUI:
         self.control_panel.pack(fill="both", expand=True, padx=10, pady=5)
         
         # 4. Inicializar Lógica
-        # Handlers para los botones del diseñador de variables
         self.var_handlers = VariableHandlers(self.var_designer)
         
-        # Gestor de Simulación
         self.sim_manager = SimulationManager(
             self.conn_config,
             self.var_handlers,
             self.control_panel
         )
-        # Inyectamos la fuente de eventos en el gestor para que sepa qué ejecutar
         self.sim_manager.events_source = self.events_panel
+
+    def _on_event_update(self):
+        """Wrapper para actualizar la visualización de la lista de eventos"""
+        if hasattr(self, 'events_panel'):
+            self.events_panel.update_current_event_display()
 
 
 if __name__ == "__main__":

@@ -73,3 +73,16 @@ class EventsListPanel:
             self.listbox.delete(self.selected_index)
             self.listbox.insert(self.selected_index, str(self.events[self.selected_index]))
             self.listbox.selection_set(self.selected_index)
+    
+    def get_config(self):
+        """Retorna la configuración de eventos para guardar"""
+        return [evt.to_dict() for evt in self.events]
+    
+    def set_config(self, events_data):
+        """Carga la configuración de eventos desde un diccionario"""
+        self.events = [EventConfig.from_dict(evt_dict) for evt_dict in events_data]
+        self._refresh_list()
+        # Seleccionar el primer evento si existe
+        if self.events:
+            self.listbox.selection_set(0)
+            self.listbox.event_generate("<<ListboxSelect>>")
