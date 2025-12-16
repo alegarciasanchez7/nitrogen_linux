@@ -79,20 +79,20 @@ class SimulationManager:
         options = config["options"]
         
         if conn_type == "MQTT":
-            host = options["host"].get()
-            topic = options["topic"].get() 
+            host = options["host"]
+            topic = options["topic"]
             return MqttConnector(event_name, template, host=host, topic=topic, on_message_callback=self.control.log)
         
         elif conn_type == "RabbitMQ":
-            host = options["host"].get()
-            port = options["port"].get()
-            user = options["user"].get()
-            password = options["password"].get()
-            queue = options["queue"].get() 
+            host = options["host"]
+            port = options["port"]
+            user = options["user"]
+            password = options["password"]
+            queue = options["queue"]
             return AmqpConnector(event_name, template, host=host, port=port, user=user, password=password, queue=queue, on_message_callback=self.control.log)
         
         else:
-            path = options["filepath"].get()
+            path = options["filepath"]
             return FileConnector(event_name, template, filepath=path, on_message_callback=self.control.log)
     
     def stop_simulation(self):
